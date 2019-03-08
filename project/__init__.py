@@ -5,7 +5,7 @@ from flask_socketio import SocketIO
 import project.appConfig as cfg
 import project.appComponents as cmps
 from flask_mobility import Mobility
-from werkzeug.contrib.cache import MemcachedCache
+from werkzeug.contrib.cache import SimpleCache
 from flask_wtf.csrf import CSRFProtect
 
 
@@ -34,7 +34,8 @@ app.jinja_env.add_extension("jinja2.ext.do")
 socketio = SocketIO(app, cors_allowed_origins = ["*"])
 
 
-c = MemcachedCache(['localhost:11211'])
+# c = MemcachedCache(['localhost:11211'])
+c = SimpleCache()
 c.delete(app.config['CACHE_KEY'])
 #jinja extention
 
@@ -43,11 +44,11 @@ c.delete(app.config['CACHE_KEY'])
 
 
 # toolbar = DebugToolbarExtension(app)
-from project.controllers import *
+# from project.controllers import *
 # TestClass.TestView.register(app)
 
 
-from project.controllersBackend import *
+# from project.controllersBackend import *
 # DashboardController.DashboardView.register(app,route_base=app.config['BACKENDROUTE']+'/dashboard')
 # UsersController.UsersView.register(app,route_base=app.config['BACKENDROUTE']+'/users')
 # RolesController.RolesView.register(app,route_base=app.config['BACKENDROUTE']+'/roles')
