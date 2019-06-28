@@ -1,6 +1,6 @@
 # from project.helper.MyDb import MyDb
 # from project.appComponents import apc
-from project.helper.RBAC.Auth import Auth
+from .Auth import Auth
 class AuthPermission(Auth):
 	name = None
 	type = None

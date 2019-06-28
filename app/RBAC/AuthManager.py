@@ -1,13 +1,13 @@
 from project import app
-from project.helper.MyDb import MyDb
+from app.MyDb import MyDb
 from project.appComponents import components as cp
-from project.helper.RBAC.Auth import Auth
-from project.helper.RBAC.BaseManager import BaseManager
-from project.helper.RBAC.AuthGroup import AuthGroup
-from project.helper.RBAC.AuthPermission import AuthPermission
-from project.helper.RBAC.AuthRole import AuthRole
-from project.helper.RBAC.AuthAssignment import AuthAssignment
-from project.helper.RBAC.AuthRule import AuthRule
+from .Auth import Auth
+from .BaseManager import BaseManager
+from .AuthGroup import AuthGroup
+from .AuthPermission import AuthPermission
+from .AuthRole import AuthRole
+from .AuthAssignment import AuthAssignment
+from .AuthRule import AuthRule
 from werkzeug.contrib.cache import MemcachedCache
 from phpserialize import serialize, unserialize
 from pathlib import Path
@@ -16,7 +16,6 @@ import importlib
 import time
 import pickle
 import sys
-
 
 class BaseClass():
 	pass

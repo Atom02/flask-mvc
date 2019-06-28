@@ -12,25 +12,26 @@ class MyDb:
 			self.params=params
 		else:
 			self.params=app.config['DB']
-		
-		if removeConv:
-			cf = conv.copy()
-			del cf[FIELD_TYPE.DATE]
-			del cf[FIELD_TYPE.DATETIME]
-			del cf[FIELD_TYPE.TIME]
-			self.db = pymysql.connect(host=self.params['host'],port=self.params['port'],
-                     user=self.params['user'],
-                     password=self.params['password'],
-                     db=self.params['db'],
-                     cursorclass=pymysql.cursors.DictCursor,conv=cf)
-		else:	
-			self.db = pymysql.connect(host=self.params['host'],port=self.params['port'],
+
+		if self.params is not None:
+			if removeConv:
+				cf = conv.copy()
+				del cf[FIELD_TYPE.DATE]
+				del cf[FIELD_TYPE.DATETIME]
+				del cf[FIELD_TYPE.TIME]
+				self.db = pymysql.connect(host=self.params['host'],port=self.params['port'],
 						user=self.params['user'],
 						password=self.params['password'],
 						db=self.params['db'],
-						cursorclass=pymysql.cursors.DictCursor)
-		self.open = True
-		self.cur=self.db.cursor()
+						cursorclass=pymysql.cursors.DictCursor,conv=cf)
+			else:	
+				self.db = pymysql.connect(host=self.params['host'],port=self.params['port'],
+							user=self.params['user'],
+							password=self.params['password'],
+							db=self.params['db'],
+							cursorclass=pymysql.cursors.DictCursor)
+			self.open = True
+			self.cur=self.db.cursor()
 
 	def openDb(self):
 		self.db = pymysql.connect(host=self.params['host'],port=self.params['port'],
