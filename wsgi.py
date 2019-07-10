@@ -2,9 +2,9 @@ import sys
 
 # print(sys.executable)
 
-path = '/var/www/python/santanu'
-if path not in sys.path:
-    sys.path.append(path)
+# path = '/var/www/python/santanu'
+# if path not in sys.path:
+#     sys.path.append(path)
 
 # sys.path.insert(0, '/var/www/html/Pywww/flaskmvc')
 #
