@@ -23,31 +23,54 @@ class BaseClass():
 
 class AuthManager(BaseManager):
 	# sys.setrecursionlimit(15000)
-	TYPE_ROLE = 1
-	TYPE_PERMISSION = 2
-	TYPE_GROUP = 3
+	# TYPE_ROLE = 1
+	# TYPE_PERMISSION = 2
+	# TYPE_GROUP = 3
 
-	db = None
-	__type = None
-	__table = {
-		"itemTable": "auth_item",
-		"itemChildTable": "auth_item_child",
-		"assignmentTable": "auth_assignment",
-		"ruleTable": "auth_rule",
-		"groupTable": "auth_group"
-	}
-	cache = None
-	c = None
-	cacheKey = app.config['CACHE_KEY']
-	item = None
-	items = {}
-	rules = {}
-	parents = {}
-	groups = {}
-	__checkAccessAssignments = {}
-	defaultRoles = []
+	# db = None
+	# __type = None
+	# __table = {
+	# 	"itemTable": "auth_item",
+	# 	"itemChildTable": "auth_item_child",
+	# 	"assignmentTable": "auth_assignment",
+	# 	"ruleTable": "auth_rule",
+	# 	"groupTable": "auth_group"
+	# }
+	# cache = None
+	# c = None
+	# cacheKey = app.config['CACHE_KEY']
+	# item = None
+	# items = {}
+	# rules = {}
+	# parents = {}
+	# groups = {}
+	# __checkAccessAssignments = {}
+	# defaultRoles = []
 
 	def __init__(self, db=None):
+		self.TYPE_ROLE = 1
+		self.TYPE_PERMISSION = 2
+		self.TYPE_GROUP = 3
+
+		self.db = None
+		self.__type = None
+		self.__table = {
+			"itemTable": "auth_item",
+			"itemChildTable": "auth_item_child",
+			"assignmentTable": "auth_assignment",
+			"ruleTable": "auth_rule",
+			"groupTable": "auth_group"
+		}
+		self.cache = None
+		self.c = None
+		self.cacheKey = app.config['CACHE_KEY']
+		self.item = None
+		self.items = {}
+		self.rules = {}
+		self.parents = {}
+		self.groups = {}
+		self.__checkAccessAssignments = {}
+		self.defaultRoles = []
 		# print ("Role Class Initated")
 		z = self.__table.copy()
 		z.update(cp["RBAC"])
@@ -244,7 +267,7 @@ class AuthManager(BaseManager):
 
 	def __removeRule(self, rule):
 		cur = self.db.getDb()
-		qp = {"rule_name": item.rule_name}
+		qp = {"rule_name": self.item.rule_name}
 		# q="""
 		#     update {item} set rule_name = NULL where rule_name=%(rule_name)s
 		# """.format(item=self.__table["itemTable"])
@@ -373,7 +396,7 @@ class AuthManager(BaseManager):
 			self.__removeItem(object)
 		elif isinstance(object, AuthRole):
 			self.__removeItem(object)
-		elif isinstance(object, AautRule):
+		elif isinstance(object, AuthRule):
 			self.__removeRule(object)
 
 	def update(self, name, object):
@@ -513,6 +536,7 @@ class AuthManager(BaseManager):
 		return groups
 
 	def getRules(self):
+		cur = self.db.getDb()
 		if bool(self.rules) is not False:
 			return self.rules
 		
@@ -523,7 +547,7 @@ class AuthManager(BaseManager):
 		rules = {}
 		if cur.rowcount > 0 :
 			res = cur.fetchall()
-			if row in res:
+			for row in res:
 				data = row["data"]
 				if data is None:
 					rule = None
@@ -534,6 +558,7 @@ class AuthManager(BaseManager):
 		return rules
 
 	def getAssignments(self,userId = None):
+		cur = self.db.getDb()
 		if userId is None:
 			return {}
 		q="""
@@ -718,7 +743,7 @@ class AuthManager(BaseManager):
 
 	def assign(self, role, userId):
 		assigment = AuthAssignment()
-		assigment.userId = userid
+		assigment.userId = userId
 		assigment.roleName = role.name
 		assigment.createdAt = int(time.time())
 
@@ -751,7 +776,7 @@ class AuthManager(BaseManager):
 		if userId is None:
 			return False
 			# raise ValueError("USerid and RoleName Must Be Given, 0 Given")
-		self.__checkAccessAssignments.pop(userid, None)
+		self.__checkAccessAssignments.pop(userId, None)
 		q = """delete from {table} where user_id=%(userid)s """.format(
 			table=self.__table["assignmentTable"])
 		qp = {"userid": userId}
@@ -815,6 +840,7 @@ class AuthManager(BaseManager):
 		self.invalidateCache()
 	
 	def removeAllAssignments(self):
+		cur = self.db.getDb()
 		self.__checkAccessAssignments = {}
 		q=""" delete from {assigment} """.format(assigment=self.__table["assignmentTable"])
 		cur.execute(q)

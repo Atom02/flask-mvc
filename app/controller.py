@@ -31,26 +31,33 @@ class controller(FlaskView):
 
         for p in acl["rules"]:
             perm = {**self.defAcl,**p}
+            print(perm)
             if perm["action"] == "*" or name in perm["action"]:
-                match = self.aclRoleCheck(perm["roles"])
-                print(match)
+                match = self.aclRoleCheck(perm["roles"])  
+                print(match)              
                 if match["status"]:
                     if perm["matchCallback"] is not None:
                         rule = match["with"]
-                        print("MATCHCALL")
                         return perm["matchCallback"](rule,name)
+
                     if not perm["allow"] and perm["denyCallback"] is not None:
                         rule = match["with"]
                         print("denied")
                         t = perm["denyCallback"](rule,name)
                         if hasattr(t,"headers"):
                             head = dict(t.headers)
+                            # print(head)
                             if t.status_code == 301 or t.status_code == 302:
                                 raise RequestRedirect(t.location, code=t.status_code)
                         return perm["denyCallback"](rule,name)
+
                     elif not perm["allow"]:
+                        print("denied")
                         rule = match["with"]
                         return acl["denyCallback"](rule,name)
+                    
+                    elif perm["allow"]:
+                        return perm["allow"]
                 
                 
             # if name in perm["action"]:
