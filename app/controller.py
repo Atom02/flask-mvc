@@ -1,13 +1,27 @@
 from flask_classy import FlaskView
-from project import app
-from flask import render_template,url_for,abort
-
+from project import app, socketio, cache
+from flask import render_template,url_for,abort,make_response,g,session
 from app.RequestRedirect import RequestRedirect
 from app.User import User
 from app.RBAC.AuthManager import AuthManager
 from app.MyDb import MyDb
+from datetime import timedelta
 import pprint
+import types
 class controller(FlaskView):
+    def __init__(self):
+        fl = types.SimpleNamespace()        
+        fl.app = app
+        fl.cache = cache
+        fl.socketio = socketio
+
+        pagedata = types.SimpleNamespace()
+        pagedata.title = app.config["NAME"]
+        pagedata.description = app.config["NAME"]
+        
+        self.fl = fl
+        self.pagedata = pagedata
+        # pass
     acl = {
         "DB":app.config["DB"],
         "denyCallback":(lambda x,y: abort(403)),
@@ -31,10 +45,10 @@ class controller(FlaskView):
 
         for p in acl["rules"]:
             perm = {**self.defAcl,**p}
-            print(perm)
+            # print(perm)
             if perm["action"] == "*" or name in perm["action"]:
                 match = self.aclRoleCheck(perm["roles"])  
-                print(match)              
+                # print(name,match)              
                 if match["status"]:
                     if perm["matchCallback"] is not None:
                         rule = match["with"]
@@ -42,7 +56,7 @@ class controller(FlaskView):
 
                     if not perm["allow"] and perm["denyCallback"] is not None:
                         rule = match["with"]
-                        print("denied")
+                        # print("denied")
                         t = perm["denyCallback"](rule,name)
                         if hasattr(t,"headers"):
                             head = dict(t.headers)
@@ -52,7 +66,7 @@ class controller(FlaskView):
                         return perm["denyCallback"](rule,name)
 
                     elif not perm["allow"]:
-                        print("denied")
+                        # print("denied")
                         rule = match["with"]
                         return acl["denyCallback"](rule,name)
                     
@@ -88,11 +102,13 @@ class controller(FlaskView):
                 auth = AuthManager(self.aclDB)
                 userRoles = auth.getRolesByUser(user["id"])
                 userRoles = list(userRoles.keys())
+                # print("A",user,userRoles)
                 isthere = [i for i in userRoles if i in roles]
                 if not isthere:
                     match = False
+                    isthere = [""]
                 else:
-                    match = True
+                    match = True        
         return {"status":match,"with":isthere[0]}
 
     def __invokeDeny(self):
@@ -103,10 +119,24 @@ class controller(FlaskView):
     def behaviors(self):
         return {}
     def before_request(self, name, *args, **kwargs):
+        # session.permanent = True
+        # app.permanent_session_lifetime = timedelta(days=31)
         if self.layout is not None:
-            app.config["layout"]=self.layout
+            app.config["layout"]=self.layout        
         self.aclCheck(name)
+        g.db = MyDb()
         pass
 
     def after_request(self, name, response):
+        if g.db is not None:
+            print('closing connection')
+            g.db.close()
         return response
+
+    def render(self,page,data={}):
+        pagedata = {}
+        pagedata["pagedata"] =self.pagedata
+        z = {**pagedata,**data}
+        resp = make_response(render_template(page,**z))
+        return resp
+        

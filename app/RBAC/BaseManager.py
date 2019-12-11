@@ -1,8 +1,8 @@
 
-from .AuthGroup import AuthGroup
-from .AuthPermission import AuthPermission
-from .AuthRole import AuthRole
-from .AuthAssignment import AuthAssignment
+from app.RBAC.AuthGroup import AuthGroup
+from app.RBAC.AuthPermission import AuthPermission
+from app.RBAC.AuthRole import AuthRole
+from app.RBAC.AuthAssignment import AuthAssignment
 
 
 class BaseManager():
