@@ -1,13 +1,13 @@
 from project import app,cache
 from app.MyDb import MyDb
-from project.appComponents import components as cp
-from app.RBAC.Auth import Auth
-from app.RBAC.BaseManager import BaseManager
-from app.RBAC.AuthGroup import AuthGroup
-from app.RBAC.AuthPermission import AuthPermission
-from app.RBAC.AuthRole import AuthRole
-from app.RBAC.AuthAssignment import AuthAssignment
-from app.RBAC.AuthRule import AuthRule
+from project.appConfig import components as cp
+from .Auth import Auth
+from .BaseManager import BaseManager
+from .AuthGroup import AuthGroup
+from .AuthPermission import AuthPermission
+from .AuthRole import AuthRole
+from .AuthAssignment import AuthAssignment
+from .AuthRule import AuthRule
 # from werkzeug.contrib.cache import MemcachedCache
 from phpserialize import serialize, unserialize
 from pathlib import Path
@@ -17,13 +17,16 @@ import time
 import pickle
 import sys
 
-
 class BaseClass():
 	pass
 
 
 class AuthManager(BaseManager):
 	# sys.setrecursionlimit(15000)
+	TYPE_ROLE = 1
+	TYPE_PERMISSION = 2
+	TYPE_GROUP = 3
+
 	db = None
 	__type = None
 	__table = {
@@ -36,6 +39,7 @@ class AuthManager(BaseManager):
 	cache = None
 	c = None
 	# cacheKey = app.config['CACHE_KEY']
+	cacheKey = "AUTHRBAC"
 	item = None
 	items = {}
 	rules = {}
@@ -43,11 +47,8 @@ class AuthManager(BaseManager):
 	groups = {}
 	__checkAccessAssignments = {}
 	defaultRoles = []
-	def __init__(self, db=None):
-		self.TYPE_ROLE = 1
-		self.TYPE_PERMISSION = 2
-		self.TYPE_GROUP = 3	
 
+	def __init__(self, db=None):
 		# print ("Role Class Initated")
 		z = self.__table.copy()
 		z.update(cp["RBAC"])
@@ -56,14 +57,18 @@ class AuthManager(BaseManager):
 			raise ValueError("Where IS THE DB??")
 		self.db = db
 		# c = MemcachedCache(['localhost:11211'])
-		c = cache
-		if c.get("RBAC") is None:
-			if c.set("RBAC", {}) is False:
+		# if c.get(self.cacheKey) is None:
+		# 	if c.set(app.config['CACHE_KEY'], {}) is False:
+		# 		raise RuntimeError("Unable To Set RBAC CACHE")
+		# else:
+		# 	self.cache = c.get(app.config['CACHE_KEY'])
+		self.c = cache
+		if self.c.get(self.cacheKey) is None:
+			if self.c.set(self.cacheKey, {}) is False:
 				raise RuntimeError("Unable To Set RBAC CACHE")
-		else:
-			self.cache = c.get("RBAC")
-		self.c = c
-		pass
+		
+		self.cache = self.c.get(self.cacheKey)
+		# pass
 
 	@staticmethod
 	def __merge_two_dicts(x, y):
@@ -76,8 +81,10 @@ class AuthManager(BaseManager):
 			assignments = self.__checkAccessAssignments[userId]
 		else:
 			assignments = self.getAssignments(userId)
-		if self.hasNoAssignments(assignments) == True:
+
+		if self.hasNoAssignments(assignments):
 			return False
+
 		self.loadFromCache()
 		if bool(self.items) is not False:
 			return self.__checkAccessFromCache(userId, permissionName, params, assignments)
@@ -93,7 +100,7 @@ class AuthManager(BaseManager):
 			return True
 		if bool(self.parents[itemName]) is not False:
 			for parent in self.parents[itemName]:
-				if self.__checkAccessFromCache(user, parent, params, assignments):
+				if self.__checkAccessFromCache(user, itemName, params, assignments):
 					return True
 
 	def __checkAccessRecursive(self, user, itemName, params, assignments):
@@ -107,7 +114,7 @@ class AuthManager(BaseManager):
 		cur = self.db.getDb()
 		q="""
 			select parent from {itemChild} where child = %(itemName)s
-		""".format(itemChild=self.__table["itemChildTable"])
+		"""
 		qp = {"itemName":itemName}
 		cur.execute(q,qp)
 		if cur.rowcount > 0:
@@ -243,7 +250,7 @@ class AuthManager(BaseManager):
 
 	def __removeRule(self, rule):
 		cur = self.db.getDb()
-		qp = {"rule_name": self.item.rule_name}
+		qp = {"rule_name": item.rule_name}
 		# q="""
 		#     update {item} set rule_name = NULL where rule_name=%(rule_name)s
 		# """.format(item=self.__table["itemTable"])
@@ -372,7 +379,7 @@ class AuthManager(BaseManager):
 			self.__removeItem(object)
 		elif isinstance(object, AuthRole):
 			self.__removeItem(object)
-		elif isinstance(object, AuthRule):
+		elif isinstance(object, AautRule):
 			self.__removeRule(object)
 
 	def update(self, name, object):
@@ -512,7 +519,6 @@ class AuthManager(BaseManager):
 		return groups
 
 	def getRules(self):
-		cur = self.db.getDb()
 		if bool(self.rules) is not False:
 			return self.rules
 		
@@ -523,7 +529,7 @@ class AuthManager(BaseManager):
 		rules = {}
 		if cur.rowcount > 0 :
 			res = cur.fetchall()
-			for row in res:
+			if row in res:
 				data = row["data"]
 				if data is None:
 					rule = None
@@ -534,11 +540,10 @@ class AuthManager(BaseManager):
 		return rules
 
 	def getAssignments(self,userId = None):
-		cur = self.db.getDb()
 		if userId is None:
 			return {}
 		q="""
-			select * from {assignment} where user_id = %(userId)s
+			select * from {assignment} and user_id = %(userId)s
 		""".format(assignment=self.__table["assignmentTable"])
 		qp={"userId":userId}
 		cur.execute(q,qp)
@@ -551,36 +556,27 @@ class AuthManager(BaseManager):
 		return assignments
 
 	def executeRule(self, user, item, params):
-		# print(vars(item))
-		if item.rule is None:
+		if item.rule_name is None:
 			return True
-		rule = self.getRule(item.rule)
+		rule = self.getRule(item.rule_name)
 		if issubclass(type(rule), AuthRule):
 			return rule.execute(user, item, params)
 		else:
-			raise ValueError("Not Found Rule {rule}".format(rule=item.rule))
+			raise ValueError("Not Found Rule {rule}".format(rule=item.rule_name))
 
 	def getRolesByUser(self,userId = None):
-		if userId is None:
-			return {}
 		cur = self.db.getDb()
-		basestring = (str, bytes)
-		if isinstance(userId, basestring):
-			userId = userId.strip()			
-		roles = {}
-		
+		userId = userId.strip()
 		if userId is None:
 			return {}
-
 		q="""
 		select b.* from {assignment} a, {item} b 
-		where a.item_name = b.name
+		where a.item_table = b.name
 		and a.user_id=%(userId)s and b.type=%(type)s
 		""".format(assignment=self.__table["assignmentTable"],item=self.__table["itemTable"])
-		
 		qp={"userId":userId,"type":self.TYPE_ROLE}
 		cur.execute(q,qp)
-		
+		roles = {}
 		if cur.rowcount > 0:
 			res = cur.fetchall()
 			for row in res:
@@ -625,76 +621,19 @@ class AuthManager(BaseManager):
 	def getPermissionsByUser(self, userId = None):
 		if userId is None:
 			return {}
-		
-		cur = self.db.getDb()
-		directPermission = self.getDirectPermissionsByUser(userId)
-		inheritedPermission = self.getInheritedPermissionsByUser(userId)
-		# print(directPermission)
-		# print(inheritedPermission)
-		merged = []
-		merged.extend(directPermission)
-		merged.extend(inheritedPermission)
-		
-		return merged
-
-	def getPermissionsByGroup(self,groupName):
-		if isinstance(groupName,AuthGroup):
-			groupName = groupName.name
-		
 		cur = self.db.getDb()
 		q="""
-		select * from {item} where type=%(type)s and group = %(group)s
-		""".format(item=self.__table["itemTable"])
-		qp={"type":self.TYPE_PERMISSION,"group":groupName}
+			select * from {assignment} where user_id = %(userId)s
+		""".format(assignment=self.__table["assignmentTable"])
+		qp={"userId":userId}
 		cur.execute(q,qp)
-		permissions = []
-		if cur.rowcount > 0:
-			res = cur.fetcall()			
-			for r in res:				
-				permissions.append(self.populateItem(r))
-		return permissions
-
-	def getDirectPermissionsByUser(self, userId = None):
-		cur = self.db.getDb()
-		q = """ select b.* from {a} a, {b} b
-		where a.item_name=b.name and a.user_id = %(userId)s and b.type=%(type)s """.format(
-			a=self.__table["assignmentTable"],b=self.__table["itemTable"])
-		qp = {"userId": userId, "type": self.TYPE_PERMISSION}
-		cur.execute(q, qp)
-		permissions = {}
+		assignments = {}
 		if cur.rowcount > 0:
 			res = cur.fetchall()
-			for r in res:
-				permissions[r["name"]] = self.populateItem(r)		
-		return permissions
-	
-	def getInheritedPermissionsByUser(self,userId = None):
-		childrenList = self.__getChildrenList()
-		cur = self.db.getDb()
-		q = """ select item_name from {a} where user_id = %(userId)s """.format(
-			a=self.__table["assignmentTable"])
-		qp = {"userId": userId}
-		cur.execute(q,qp) 
-
-		result = {}
-		if cur.rowcount > 0:
-			res = cur.fetchall()
-			for roleName in res:
-				self.__getChildrenRecursive(roleName['item_name'],childrenList,result)
-		
-		if not result:
-			return []
-		
-		q= """ select * from {a} where type=%(type)s and name in %(name)s """.format(a=self.__table["itemTable"])
-		qp= {"type":self.TYPE_PERMISSION,"name":list(result.keys())}
-		cur.execute(q,qp)
-		permisions = {}
-		if cur.rowcount > 0:
-			res = cur.fetchall()
-			for r in res:
-				permisions[r["name"]] = self.populateItem(r)
-		
-		return permisions
+			for row in res:
+				asg = AuthAssignment(row)
+				assignments[row["item_name"]] = asg
+		return assignments
 	
 	def canAddChild(self,parent,child):
 		return not self.__detectLoop(parent,child)
@@ -818,7 +757,7 @@ class AuthManager(BaseManager):
 		if userId is None:
 			return False
 			# raise ValueError("USerid and RoleName Must Be Given, 0 Given")
-		self.__checkAccessAssignments.pop(userId, None)
+		self.__checkAccessAssignments.pop(userid, None)
 		q = """delete from {table} where user_id=%(userid)s """.format(
 			table=self.__table["assignmentTable"])
 		qp = {"userid": userId}
@@ -841,7 +780,7 @@ class AuthManager(BaseManager):
 		self.__removeAllItems(self.TYPE_PERMISSION)
 	
 	def removeAllRoles(self):
-		self.__removeAllItems(self.TYPE_ROLE)
+		self.__removeAllItems(self.TYPE_PERMISSION)
 
 	def __removeAllItems(self, utype):
 		# no cascade check make it if you use database that do not support cascade
@@ -882,7 +821,6 @@ class AuthManager(BaseManager):
 		self.invalidateCache()
 	
 	def removeAllAssignments(self):
-		cur = self.db.getDb()
 		self.__checkAccessAssignments = {}
 		q=""" delete from {assigment} """.format(assigment=self.__table["assignmentTable"])
 		cur.execute(q)
@@ -907,7 +845,7 @@ class AuthManager(BaseManager):
 		if self.items is not None:
 			return True
 
-		data = self.cache.get("RBAC")
+		data = self.cache.get(self.cacheKey)
 		if isinstance(data, dict) and 'items' in data and 'rules' in data and 'parents' in data:
 			self.items = data['items']
 			self.rules = data['rules']
@@ -947,21 +885,19 @@ class AuthManager(BaseManager):
 						self.parents[row["child"]] = []
 					self.parents[row["child"]].append(row["parent"])
 
-		# print("AUTH SET CACHE")
 		self.c.set("items",self.items)
 		self.c.set("rules",self.rules)
 		self.c.set("parents",self.parents)
 
 	def hasNoAssignments(self, assigments={}):
 		if bool(assigments) is False and bool(self.defaultRoles) is False:
-			return True
-		else:
 			return False
+		else:
+			return True
 
 	def invalidateCache(self):
 		if self.cache is not None:
-			# self.c.set(app.config['CACHE_KEY'], {})
-			self.c.set("RBAC",{})
+			self.c.set(self.cacheKey, {})
 			self.items = {}
 			self.rules = {}
 			self.parents = {}
@@ -969,7 +905,8 @@ class AuthManager(BaseManager):
 		self.__checkAccessAssignments = {}
 
 	def populateItem(self, row):
-		clas = AuthRole(row["name"]) if row["type"] == self.TYPE_ROLE else AuthPermission(row["name"])
+		clas = AuthRole(
+			row["name"]) if row["type"] == self.TYPE_ROLE else AuthPermission(row["name"])
 		if row["data"] is None:
 			data = None
 		else:

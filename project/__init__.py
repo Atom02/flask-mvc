@@ -1,54 +1,82 @@
 # -*- coding: utf-8 -*-
-__version__ = '0.1'
+__version__ = '1.0.1'
 from flask import Flask,redirect,url_for
 from flask_socketio import SocketIO
-import project.appConfig as cfg
-import project.appComponents as cmps
+import project.appConfig as cfgP
+import project.appConfigLocal as cfgLocal
 from flask_mobility import Mobility
-from werkzeug.contrib.cache import SimpleCache
+from flask_session import Session
+from flask_caching import Cache
 from flask_wtf.csrf import CSRFProtect
+import types
+import os
+from datetime import timedelta
+# from flask_sqlalchemy import SQLAlchemy
+# from flask_migrate import Migrate
+
+cfgTmp = [a for a in dir(cfgP) if not a.startswith('__')]
+cfg = types.SimpleNamespace()
+for c in cfgTmp:
+	setattr(cfg,c,getattr(cfgP,c))
+	if hasattr(cfgLocal, c):
+		setattr(cfg,c,getattr(cfgLocal,c))
 
 
 app = Flask('project')
 csrf = CSRFProtect(app)
 Mobility(app)
 
-app.secret_key = 'xUYLx8o#))[1@K1pQvVrvHHKf7/' #'onehotonekill'
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://candra:db_lapan2089@192.168.3.19:3306/santanu_live'
-# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.secret_key = 'changeToYourSecretKey' #'onehotonekill'
 
-# db = SQLAlchemy(app)
+app.config["NAME"]="ProjectName"
 app.config['SECRET_KEY'] = app.secret_key
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
-app.config['COMPONENTS'] = cmps
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024 #32 Mega
+app.config['CACHE_KEY_PREFIX']='pttimah'
+app.config["CACHE_TYPE"]="simple"
+app.config["CACHE_DEFAULT_TIMEOUT"]=600
+app.config["CACHE_THRESHOLD"]=1000
+app.config["SESSION_TYPE"]="filesystem"
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=31)
+app.config['SESSION_PERMANENT'] = True 
+
+app.config['COMPONENTS'] = cfg.components
 app.config['DB'] = cfg.DB
-app.config['CACHE_KEY']='santanu_rbac'
-app.config['BACKENDROUTE']='/office'
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config["ALLOWED_EXTENSIONS"] = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'])
+
+
+# testing alchecmy but we will not use it
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://'+cfg.DB['user']+':'+cfg.DB['password']+'@'+cfg.DB['host']+':'+str(cfg.DB['port'])+'/'+cfg.DB['db']
+# app.config['SQLALCHEMY_ECHO'] = True
+# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # app.url_map.strict_slashes = False
 # app.config['EXPLAIN_TEMPLATE_LOADING'] = True
+
 app.debug = True
 app.jinja_env.add_extension("project.helper.JinjaExt.RelativeInclude")
 app.jinja_env.add_extension("jinja2.ext.do")
+
 socketio = SocketIO(app, cors_allowed_origins = ["*"])
+cache = Cache(app)
+# db = SQLAlchemy(app)
+# migrate = Migrate(app, db)
 
 
-# c = MemcachedCache(['localhost:11211'])
-c = SimpleCache()
-c.delete(app.config['CACHE_KEY'])
-#jinja extention
+# models imports
+# from project.alchemy import User
 
 
 
 
-
+# example your route, below this is the example 
 # toolbar = DebugToolbarExtension(app)
+
+# app.config['route']={
+# 	"console":"/console"
+# }
+# from project.console import *
+# GsmapConsole.GsmapView.register(app,route_prefix=app.config['route']['console'])
+
 # from project.controllers import *
-# TestClass.TestView.register(app)
-
-
-# from project.controllersBackend import *
-# DashboardController.DashboardView.register(app,route_base=app.config['BACKENDROUTE']+'/dashboard')
-# UsersController.UsersView.register(app,route_base=app.config['BACKENDROUTE']+'/users')
-# RolesController.RolesView.register(app,route_base=app.config['BACKENDROUTE']+'/roles')
+# SiteController.SiteView.register(app)
