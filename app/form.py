@@ -5,6 +5,8 @@ class form(Form):
     # db = None
     def __init__(self, db = None):
         super().__init__()
+        # if(db is None):
+        #     raise ValueError("db required form(db)")
         self.db = db
 
     def addError(self,ername,msg=None):

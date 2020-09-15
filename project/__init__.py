@@ -62,21 +62,6 @@ cache = Cache(app)
 # db = SQLAlchemy(app)
 # migrate = Migrate(app, db)
 
-
-# models imports
-# from project.alchemy import User
-
-
-
-
-# example your route, below this is the example 
-# toolbar = DebugToolbarExtension(app)
-
-# app.config['route']={
-# 	"console":"/console"
-# }
-# from project.console import *
-# GsmapConsole.GsmapView.register(app,route_prefix=app.config['route']['console'])
-
-# from project.controllers import *
-# SiteController.SiteView.register(app)
+# REGISTER YOUR ROUTE
+from project.controllers import *
+SiteController.SiteView.register(app)
